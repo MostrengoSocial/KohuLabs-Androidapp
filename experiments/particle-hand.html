@@ -138,7 +138,7 @@ function makeHand(seed) {
     slant: lerp(-0.12, 0.46, r()),       // forward lean (shear)
     xs: lerp(0.78, 1.32, r()),           // letter width
     asc: lerp(0.7, 1.18, r()),           // ascender height
-    jit: lerp(0.015, 0.085, r()),        // shakiness per control point
+    jit: lerp(0.04, 0.11, r()),        // shakiness per control point
     wob: lerp(0.0, 0.14, r()),           // baseline wave
     wobF: lerp(0.12, 0.45, r()),
     tilt: lerp(-0.025, 0.025, r()),      // line uphill / downhill
@@ -149,8 +149,8 @@ function makeHand(seed) {
     joined: r() > 0.22,
     roundness: lerp(0.85, 1.2, r()),     // horizontal swell around glyph centre
     pressureNoise: lerp(0.05, 0.35, r()),
-    passes: 2 + Math.floor(r() * 3),     // times the pen goes over each stroke
-    loose: lerp(0.025, 0.09, r()),       // how far the passes stray from each other
+    passes: 3 + Math.floor(r() * 4),     // times the pen goes over each stroke
+    loose: lerp(0.07, 0.16, r()),       // how far the passes stray from each other
     line: lerp(0.8, 1.3, r()),           // ballpoint line weight
   };
 }
@@ -302,24 +302,26 @@ function buildScene(hand) {
   for (let j = 0; j < hand.passes; j++) {
     const ph = [rp() * 6.283, rp() * 6.283, rp() * 6.283];
     const fr = [lerp(0.02, 0.05, rp()), lerp(0.06, 0.13, rp()), lerp(0.15, 0.3, rp())];
-    const amp = j === 0 ? 0.35 : 1;
+    const amp = j === 0 ? 0.6 : 1;
+    const loopR = lerp(0.025, 0.075, rp()) * u, loopF = lerp(0.22, 0.45, rp()), loopP = rp() * 6.283;
     const lag = j * lerp(0.03, 0.09, rp());
     const pts = [];
     for (let i = 0; i < samples.length; i++) {
       const s = samples[i];
       if (s.dot) {
-        const rr = Math.max(1.2, s.w * 0.45), turns = 1.4 + rp(), a0 = rp() * 6.283, steps = 20;
+        const rr = Math.max(2, s.w * 0.8), turns = 2.5 + rp() * 2, a0 = rp() * 6.283, steps = 40;
+        const cx = s.x + (rp() - 0.5) * loose, cy = s.y + (rp() - 0.5) * loose;
         for (let k = 0; k <= steps; k++) {
-          const a = a0 + (k / steps) * turns * 6.283, q = rr * (0.5 + 0.5 * k / steps);
-          pts.push({ x: s.x + Math.cos(a) * q, y: s.y + Math.sin(a) * q * 0.85, t: timeOf(s) + lag + k * 0.006, si: s.si, w: 1.3 * hand.line });
+          const a = a0 + (k / steps) * turns * 6.283, q = rr * (0.35 + 0.65 * rp());
+          pts.push({ x: cx + Math.cos(a) * q, y: cy + Math.sin(a) * q * 0.85, t: timeOf(s) + lag + k * 0.006, si: s.si, w: 1.3 * hand.line });
         }
         continue;
       }
-      if (i & 1) continue;
       const n = Math.sin(s.d * fr[0] + ph[0]) * 0.55 + Math.sin(s.d * fr[1] + ph[1]) * 0.3 + Math.sin(s.d * fr[2] + ph[2]) * 0.15;
       const off = n * loose * amp;
       const press = Math.min(1, (s.w / nib) / 1.6);
-      pts.push({ x: s.x + s.nx * off, y: s.y + s.ny * off, t: timeOf(s) + lag, si: s.si, w: lerp(0.55, 1.8, press) * hand.line });
+      const lr = loopR * (0.5 + 0.5 * Math.sin(s.d * 0.017 + loopP));
+      pts.push({ x: s.x + s.nx * off + Math.cos(s.d * loopF + loopP) * lr, y: s.y + s.ny * off + Math.sin(s.d * loopF + loopP) * lr, t: timeOf(s) + lag, si: s.si, w: lerp(0.55, 1.8, press) * hand.line });
     }
     if (j > 0) { const thin = lerp(0.5, 0.8, rp()); pts.forEach((p) => { p.w *= thin; }); }
     tracers.push({ pts, idx: 0, alpha: 1 });
@@ -399,7 +401,7 @@ function describe(hand) {
   $("sP").textContent = hand.contrast > 1.15 ? "heavy downstrokes" : hand.contrast > 0.5 ? "moderate" : "even, light";
   $("sB").textContent = hand.wob < 0.04 ? "steady" : hand.wob < 0.09 ? "wavering" : "wandering";
   $("sC").textContent = (hand.joined ? "connected" : "printed") + (hand.space > 0.12 ? ", open" : hand.space < 0 ? ", cramped" : "");
-  $("sN").textContent = `${hand.passes} passes, ${hand.loose > 0.06 ? "loose" : "tight"}`;
+  $("sN").textContent = `${hand.passes} passes, ${hand.loose > 0.115 ? "wild" : "loose"}`;
 }
 
 /* ---------- Control ---------- */
