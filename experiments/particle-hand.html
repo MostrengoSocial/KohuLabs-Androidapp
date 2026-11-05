@@ -1,0 +1,480 @@
+<title>Invented Hand</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one full-bleed penmanship sheet; the phrase is written live by ink particles, a specimen card reads out the invented hand below. */
+:root {
+  --paper: #eceef1;
+  --ink: #1b2233;
+  --fresh: #c2410c;
+  --muted: #5d6677;
+  --rule: rgba(60, 80, 120, 0.13);
+  --card: rgba(255, 255, 255, 0.72);
+  --line: rgba(27, 34, 51, 0.14);
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1118; --ink: #dfe6f5; --fresh: #ff8a4c; --muted: #8b94a8;
+    --rule: rgba(150, 170, 220, 0.10); --card: rgba(20, 25, 36, 0.78); --line: rgba(223, 230, 245, 0.14);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1118; --ink: #dfe6f5; --fresh: #ff8a4c; --muted: #8b94a8;
+  --rule: rgba(150, 170, 220, 0.10); --card: rgba(20, 25, 36, 0.78); --line: rgba(223, 230, 245, 0.14);
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: var(--display); overflow: hidden;
+}
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.top, .bottom {
+  position: fixed; left: 0; right: 0; z-index: 2; pointer-events: none;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.top { top: 0; padding-block: calc(16px + env(safe-area-inset-top, 0px)) 0; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand { font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em; }
+.brand span { color: var(--muted); font-weight: 500; }
+.hint { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); letter-spacing: 0.02em; }
+.bottom { bottom: 0; padding-block: 0 calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; justify-content: center; }
+.card {
+  pointer-events: auto; background: var(--card); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; max-width: 920px; width: 100%;
+}
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px 18px; flex: 1 1 420px; min-width: 0; }
+.spec div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.spec dt { font-family: var(--mono); font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.spec dd { margin: 0; font-family: var(--mono); font-size: 0.84rem; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.actions { display: flex; gap: 8px; flex: 0 0 auto; }
+button {
+  font: 600 0.88rem var(--display); color: var(--ink); background: transparent;
+  border: 1px solid var(--line); border-radius: 999px; padding: 9px 16px; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+button:hover { border-color: var(--ink); }
+button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+button.primary:hover { background: var(--fresh); border-color: var(--fresh); }
+button:focus-visible { outline: 2px solid var(--fresh); outline-offset: 2px; }
+@media (max-width: 520px) { .hint { display: none; } .actions { width: 100%; } .actions button { flex: 1; } }
+</style>
+
+<canvas id="c" aria-label="The phrase 'To be individual is to be sick.' written in a randomly invented handwriting made of ink particles"></canvas>
+
+<header class="top">
+  <div class="brand">Invented Hand <span id="handNo">No. 0000</span></div>
+  <div class="hint">move through the ink · N for a new hand · R to rewrite</div>
+</header>
+
+<footer class="bottom">
+  <div class="card">
+    <dl class="spec" id="spec">
+      <div><dt>Slant</dt><dd id="sSlant">–</dd></div>
+      <div><dt>x-height</dt><dd id="sX">–</dd></div>
+      <div><dt>Pressure</dt><dd id="sP">–</dd></div>
+      <div><dt>Baseline</dt><dd id="sB">–</dd></div>
+      <div><dt>Letterforms</dt><dd id="sC">–</dd></div>
+      <div><dt>Particles</dt><dd id="sN">–</dd></div>
+    </dl>
+    <div class="actions">
+      <button id="rewrite" type="button">Rewrite</button>
+      <button id="newHand" type="button" class="primary">New hand</button>
+    </div>
+  </div>
+</footer>
+
+<script>
+(() => {
+const PHRASE = "To be individual is to be sick.";
+
+/* Single-stroke glyph skeletons. Units: baseline y=0, x-height y=1, ascender ~1.9, y points up.
+   s[0] is the joined stroke; further strokes (dots, crossbars) are lifted and drawn after the word. */
+const G = {
+  T: { w: 1.05, join: false, s: [[[-0.05,1.62],[0.35,1.8],[0.75,1.78],[1.12,1.86]], [[0.58,1.8],[0.5,1.1],[0.42,0.35],[0.3,0.02],[0.08,0.1]]] },
+  o: { w: 0.95, s: [[[0.72,0.86],[0.42,1.0],[0.1,0.7],[0.1,0.18],[0.42,0.0],[0.72,0.32],[0.72,0.86],[0.92,0.82]]] },
+  b: { w: 0.9, s: [[[0.0,0.2],[0.22,1.2],[0.32,1.86],[0.14,1.7],[0.06,0.7],[0.08,0.06],[0.42,0.04],[0.64,0.45],[0.46,0.92],[0.18,0.62],[0.5,0.55],[0.86,0.66]]] },
+  e: { w: 0.82, s: [[[0.0,0.3],[0.5,0.52],[0.66,0.84],[0.42,1.0],[0.12,0.76],[0.1,0.24],[0.4,0.0],[0.78,0.16]]] },
+  i: { w: 0.5, s: [[[0.0,0.12],[0.18,0.96],[0.16,0.22],[0.28,0.0],[0.48,0.16]], [[0.24,1.42]]] },
+  n: { w: 1.0, s: [[[0.0,0.05],[0.1,0.96],[0.1,0.02],[0.2,0.68],[0.48,0.98],[0.66,0.7],[0.64,0.12],[0.78,0.0],[0.96,0.16]]] },
+  d: { w: 1.0, s: [[[0.64,0.8],[0.36,1.0],[0.06,0.62],[0.12,0.1],[0.44,0.04],[0.64,0.52],[0.74,1.9],[0.68,0.3],[0.8,0.0],[0.96,0.16]]] },
+  v: { w: 0.88, s: [[[0.0,0.82],[0.14,0.96],[0.4,0.02],[0.66,0.96],[0.86,0.9]]] },
+  u: { w: 1.0, s: [[[0.0,0.9],[0.04,0.26],[0.3,0.0],[0.6,0.3],[0.68,0.96],[0.66,0.2],[0.8,0.0],[0.96,0.16]]] },
+  a: { w: 1.0, s: [[[0.7,0.8],[0.4,1.0],[0.06,0.6],[0.12,0.08],[0.44,0.04],[0.68,0.5],[0.72,0.96],[0.68,0.3],[0.78,0.0],[0.96,0.16]]] },
+  l: { w: 0.62, s: [[[0.0,0.2],[0.34,1.22],[0.4,1.86],[0.2,1.72],[0.12,0.9],[0.14,0.14],[0.34,0.0],[0.58,0.16]]] },
+  s: { w: 0.82, s: [[[0.0,0.14],[0.34,1.0],[0.58,0.44],[0.44,0.04],[0.1,0.12],[0.5,0.02],[0.8,0.16]]] },
+  t: { w: 0.78, s: [[[0.0,0.1],[0.28,1.0],[0.34,1.6],[0.24,0.6],[0.28,0.04],[0.5,0.0],[0.74,0.16]], [[0.02,1.04],[0.36,1.1],[0.66,1.1]]] },
+  c: { w: 0.82, s: [[[0.56,0.94],[0.72,0.9],[0.6,0.99],[0.34,0.95],[0.1,0.66],[0.12,0.18],[0.44,0.0],[0.8,0.16]]] },
+  k: { w: 0.95, s: [[[0.0,0.2],[0.3,1.3],[0.36,1.88],[0.2,1.62],[0.1,0.0],[0.16,0.5],[0.5,0.96],[0.6,0.76],[0.24,0.5],[0.46,0.34],[0.6,0.02],[0.86,0.16]]] },
+  ".": { w: 0.5, join: false, s: [[[0.18,0.04]]] }
+};
+
+const $ = (id) => document.getElementById(id);
+const canvas = $("c"), ctx = canvas.getContext("2d");
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+let W = 0, H = 0, DPR = 1;
+let colors = {};
+
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  colors = { paper: cs.getPropertyValue("--paper").trim(), ink: cs.getPropertyValue("--ink").trim(),
+             fresh: cs.getPropertyValue("--fresh").trim(), rule: cs.getPropertyValue("--rule").trim() };
+}
+
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const lerp = (a, b, t) => a + (b - a) * t;
+
+/* ---------- The hand: every trait of the invented script comes from one seed ---------- */
+function makeHand(seed) {
+  const r = mulberry32(seed);
+  return {
+    seed,
+    slant: lerp(-0.12, 0.46, r()),       // forward lean (shear)
+    xs: lerp(0.78, 1.32, r()),           // letter width
+    asc: lerp(0.7, 1.18, r()),           // ascender height
+    jit: lerp(0.015, 0.085, r()),        // shakiness per control point
+    wob: lerp(0.0, 0.14, r()),           // baseline wave
+    wobF: lerp(0.12, 0.45, r()),
+    tilt: lerp(-0.025, 0.025, r()),      // line uphill / downhill
+    space: lerp(-0.06, 0.22, r()),       // letter spacing
+    wordGap: lerp(0.6, 1.2, r()),
+    weight: lerp(0.06, 0.15, r()),       // nib width relative to x-height
+    contrast: lerp(0.0, 1.7, r()),       // downstroke pressure gain
+    joined: r() > 0.22,
+    roundness: lerp(0.85, 1.2, r()),     // horizontal swell around glyph centre
+    pressureNoise: lerp(0.05, 0.35, r()),
+  };
+}
+
+function glyphWords(hand) {
+  const r = mulberry32(hand.seed * 31 + 7);
+  const gauss = () => (r() + r() + r() - 1.5) * 1.2;
+  return PHRASE.split(" ").map((word) => {
+    let x = 0, cur = null, prevJoin = false;
+    const strokes = [], extras = [];
+    for (const ch of word) {
+      const g = G[ch]; if (!g) continue;
+      const ox = x;
+      const tf = ([px, py]) => {
+        if (py > 1) py = 1 + (py - 1) * hand.asc;
+        px = 0.45 * g.w + (px - 0.45 * g.w) * hand.roundness;
+        return [ox + px * hand.xs + gauss() * hand.jit, py + gauss() * hand.jit];
+      };
+      const main = g.s[0].map(tf);
+      const canJoin = g.join !== false;
+      if (hand.joined && canJoin && prevJoin && cur) cur.push(...main);
+      else { cur = main; strokes.push(cur); }
+      for (let k = 1; k < g.s.length; k++) {
+        const ex = g.s[k].map(tf);
+        if (ch === "T") strokes.splice(strokes.length - 1, 0, ex); // T: bar first, then stem
+        else extras.push(ex);
+      }
+      prevJoin = canJoin;
+      x += g.w * hand.xs * hand.roundness + hand.space;
+    }
+    return { strokes: strokes.concat(extras), width: x };
+  });
+}
+
+/* ---------- Layout: wrap words to the sheet and fit the largest size ---------- */
+function layoutLines(words, hand, u, maxW) {
+  const lines = []; let line = [], lw = 0;
+  const gap = hand.wordGap;
+  for (const w of words) {
+    const add = (line.length ? gap : 0) + w.width;
+    if (line.length && (lw + add) * u > maxW) { lines.push({ words: line, width: lw }); line = []; lw = 0; }
+    line.push(w); lw += (line.length > 1 ? gap : 0) + w.width;
+  }
+  if (line.length) lines.push({ words: line, width: lw });
+  return lines;
+}
+
+function catmull(pts, out) {
+  if (pts.length === 1) { out.push(pts[0]); return; }
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const steps = Math.max(4, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 1.5));
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps, t2 = t * t, t3 = t2 * t;
+      out.push([
+        0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
+        0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)
+      ]);
+    }
+  }
+  out.push(pts[pts.length - 1]);
+}
+
+let scene = null; // { particles, tip, duration, guides, u }
+
+function buildScene(hand) {
+  const words = glyphWords(hand);
+  const card = document.querySelector(".card");
+  const topPad = 70, botPad = (card ? card.getBoundingClientRect().height : 120) + 44;
+  const availW = W - Math.max(32, W * 0.12), availH = Math.max(120, H - topPad - botPad);
+  const lineH = 3.3;
+  let u = Math.min(availH / 2.6, 140), lines;
+  for (let i = 0; i < 80; i++) {
+    lines = layoutLines(words, hand, u, availW);
+    const tooWide = lines.some((l) => l.width * u > availW);
+    if (!tooWide && (lines.length * lineH - 1.0) * u <= availH) break;
+    u *= 0.95;
+  }
+  const blockW = Math.max(...lines.map((l) => l.width)) * u;
+  const blockH = (lines.length * lineH - 1.0) * u;
+  const left = (W - blockW) / 2 - hand.slant * u * 0.5;
+  const top = topPad + (availH - blockH) / 2 + 1.9 * u;
+  const r = mulberry32(hand.seed * 131 + 3);
+  const phase = r() * 10;
+
+  // Map each stroke to screen space, densify, and lay down pen samples.
+  const samples = []; // {x,y,nx,ny,w,len,stroke}
+  const guides = [];
+  const strokesScreen = [];
+  lines.forEach((line, li) => {
+    const base = top + li * lineH * u;
+    guides.push({ base, xh: base - u, asc: base - 1.9 * u });
+    const indent = (r() - 0.5) * u * 0.6;
+    let wx = 0;
+    const lineTilt = hand.tilt + (r() - 0.5) * 0.01;
+    line.words.forEach((word) => {
+      word.strokes.forEach((st) => {
+        const pts = st.map(([x, y]) => {
+          const gx = wx + x;
+          const yy = y + hand.wob * Math.sin(phase + gx * hand.wobF * 2.1) + gx * lineTilt * -1;
+          return [left + indent + (gx + y * hand.slant) * u, base - yy * u];
+        });
+        strokesScreen.push(pts);
+      });
+      wx += word.width + hand.wordGap;
+    });
+  });
+
+  const nib = hand.weight * u;
+  let totalLen = 0;
+  strokesScreen.forEach((pts, si) => {
+    const dense = []; catmull(pts, dense);
+    if (dense.length === 1) {
+      samples.push({ x: dense[0][0], y: dense[0][1], nx: 0, ny: 0, w: nib * 1.5, dot: true, si, d: totalLen });
+      totalLen += nib; return;
+    }
+    // arc-length resample at ~1px
+    let acc = 0; const out = [dense[0]];
+    for (let i = 1; i < dense.length; i++) {
+      const [ax, ay] = dense[i - 1], [bx, by] = dense[i];
+      const seg = Math.hypot(bx - ax, by - ay);
+      acc += seg;
+      while (acc >= 1) { acc -= 1; const t = 1 - acc / (seg || 1); out.push([lerp(ax, bx, t), lerp(ay, by, t)]); }
+    }
+    const n = out.length;
+    for (let i = 0; i < n; i++) {
+      const a = out[Math.max(0, i - 2)], b = out[Math.min(n - 1, i + 2)];
+      let dx = b[0] - a[0], dy = b[1] - a[1]; const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+      const s = i / (n - 1);
+      const taper = 0.35 + 0.65 * Math.pow(Math.sin(Math.PI * Math.min(1, s * 1.05 + 0.02)), 0.5);
+      const down = Math.max(0, dy);                 // screen y grows downward → downstroke
+      const noise = 1 + hand.pressureNoise * Math.sin(i * 0.05 + si * 1.7);
+      const w = nib * taper * (0.55 + hand.contrast * down * 0.8) * noise;
+      samples.push({ x: out[i][0], y: out[i][1], nx: -dy, ny: dx, w: Math.max(0.6, w), si, d: totalLen + i });
+    }
+    totalLen += n;
+  });
+
+  // Particle budget
+  const maxP = Math.round(Math.min(22000, Math.max(7000, W * H / 70)));
+  const sumW = samples.reduce((a, s) => a + (s.dot ? s.w * s.w * 2 : s.w), 0);
+  const dens = Math.min(1.6, maxP / sumW);
+
+  // Timing: pen travels at constant speed, with a pause at every lift.
+  const writeSeconds = 6.0;
+  const liftPause = 0.14;
+  const lifts = strokesScreen.length;
+  const speed = totalLen / Math.max(1, writeSeconds - lifts * liftPause);
+  const timeOf = (s) => s.d / speed + s.si * liftPause;
+
+  const P = [];
+  const rp = mulberry32(hand.seed * 977 + 11);
+  for (const s of samples) {
+    const count = s.dot ? s.w * s.w * 2 * dens : s.w * dens;
+    let k = Math.floor(count); if (rp() < count - k) k++;
+    for (let j = 0; j < k; j++) {
+      let tx, ty;
+      if (s.dot) { const a = rp() * Math.PI * 2, rr = Math.sqrt(rp()) * s.w; tx = s.x + Math.cos(a) * rr; ty = s.y + Math.sin(a) * rr * 0.8; }
+      else { const off = (rp() - 0.5) * s.w; tx = s.x + s.nx * off; ty = s.y + s.ny * off; }
+      P.push({ tx, ty, t: timeOf(s) + rp() * 0.02, ph: rp() * 6.283, sz: 0.8 + rp() * 0.9 });
+    }
+  }
+
+  const N = P.length;
+  const ps = {
+    n: N,
+    tx: new Float32Array(N), ty: new Float32Array(N), x: new Float32Array(N), y: new Float32Array(N),
+    vx: new Float32Array(N), vy: new Float32Array(N), born: new Float32Array(N), ph: new Float32Array(N), sz: new Float32Array(N), alive: new Uint8Array(N)
+  };
+  P.forEach((p, i) => { ps.tx[i] = p.tx; ps.ty[i] = p.ty; ps.born[i] = p.t; ps.ph[i] = p.ph; ps.sz[i] = p.sz; });
+
+  // Pen-tip path for the glowing nib while writing
+  const tip = samples.map((s) => ({ t: timeOf(s), x: s.x, y: s.y }));
+  return { ps, tip, duration: writeSeconds + 0.4, guides, u, hand, N };
+}
+
+/* ---------- Simulation ---------- */
+let dying = [];        // particles from the previous hand, drifting away
+let start = performance.now() / 1000;
+let pointer = { x: -9999, y: -9999, active: false };
+
+function spawn(ps, i) {
+  const a = Math.random() * Math.PI * 2, r = 3 + Math.random() * 9;
+  ps.x[i] = ps.tx[i] + Math.cos(a) * r; ps.y[i] = ps.ty[i] + Math.sin(a) * r;
+  ps.vx[i] = (Math.random() - 0.5) * 1.2; ps.vy[i] = (Math.random() - 0.5) * 1.2;
+  ps.alive[i] = 1;
+}
+
+function settleAll(ps) { for (let i = 0; i < ps.n; i++) { ps.x[i] = ps.tx[i]; ps.y[i] = ps.ty[i]; ps.vx[i] = ps.vy[i] = 0; ps.alive[i] = 1; ps.born[i] = -10; } }
+
+function drawGuides() {
+  ctx.strokeStyle = colors.rule; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (const g of scene.guides) {
+    ctx.moveTo(0, Math.round(g.base) + 0.5); ctx.lineTo(W, Math.round(g.base) + 0.5);
+  }
+  ctx.stroke();
+  ctx.setLineDash([3, 5]); ctx.beginPath();
+  for (const g of scene.guides) { ctx.moveTo(0, Math.round(g.xh) + 0.5); ctx.lineTo(W, Math.round(g.xh) + 0.5); }
+  ctx.stroke(); ctx.setLineDash([]);
+  // margin rule
+  ctx.beginPath(); const mx = Math.round(Math.max(18, W * 0.045)) + 0.5; ctx.moveTo(mx, 0); ctx.lineTo(mx, H); ctx.stroke();
+}
+
+function frame(nowMs) {
+  const now = nowMs / 1000, t = now - start;
+  const still = reduceMotion.matches;
+  ctx.fillStyle = colors.paper; ctx.fillRect(0, 0, W, H);
+  drawGuides();
+
+  // previous hand dissolving
+  if (dying.length) {
+    ctx.fillStyle = colors.ink;
+    dying = dying.filter((d) => {
+      const age = now - d.t0; if (age > 1.4) return false;
+      ctx.globalAlpha = Math.max(0, 1 - age / 1.4) * 0.8;
+      const { ps } = d;
+      for (let i = 0; i < ps.n; i += 1) {
+        ps.vx[i] += Math.sin(ps.ph[i] + age * 3) * 0.06; ps.vy[i] -= 0.03 + Math.cos(ps.ph[i]) * 0.02;
+        ps.x[i] += ps.vx[i]; ps.y[i] += ps.vy[i];
+        ctx.fillRect(ps.x[i], ps.y[i], ps.sz[i], ps.sz[i]);
+      }
+      return true;
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  const ps = scene.ps;
+  const pr = 70, pr2 = pr * pr;
+  const settled = [], fresh = [];
+  for (let i = 0; i < ps.n; i++) {
+    if (!ps.alive[i]) { if (t >= ps.born[i]) spawn(ps, i); else continue; }
+    let gx = ps.tx[i], gy = ps.ty[i];
+    if (!still) { gx += Math.sin(t * 1.3 + ps.ph[i]) * 0.35; gy += Math.cos(t * 1.1 + ps.ph[i] * 1.3) * 0.35; }
+    let ax = (gx - ps.x[i]) * 0.08, ay = (gy - ps.y[i]) * 0.08;
+    if (pointer.active) {
+      const dx = ps.x[i] - pointer.x, dy = ps.y[i] - pointer.y, d2 = dx * dx + dy * dy;
+      if (d2 < pr2 && d2 > 0.01) { const d = Math.sqrt(d2), f = (1 - d / pr) * 3.2; ax += dx / d * f; ay += dy / d * f; }
+    }
+    ps.vx[i] = (ps.vx[i] + ax) * 0.82; ps.vy[i] = (ps.vy[i] + ay) * 0.82;
+    ps.x[i] += ps.vx[i]; ps.y[i] += ps.vy[i];
+    (t - ps.born[i] < 0.7 ? fresh : settled).push(i);
+  }
+  ctx.fillStyle = colors.ink; ctx.globalAlpha = 0.86;
+  for (const i of settled) ctx.fillRect(ps.x[i], ps.y[i], ps.sz[i], ps.sz[i]);
+  ctx.fillStyle = colors.fresh; ctx.globalAlpha = 0.9;
+  for (const i of fresh) ctx.fillRect(ps.x[i], ps.y[i], ps.sz[i] * 1.1, ps.sz[i] * 1.1);
+  ctx.globalAlpha = 1;
+
+  // nib
+  if (t < scene.duration && scene.tip.length) {
+    const tip = scene.tip; let lo = 0, hi = tip.length - 1;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (tip[m].t <= t) lo = m; else hi = m - 1; }
+    const p = tip[lo];
+    if (t - p.t < 0.12) {
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, scene.u * 0.35);
+      g.addColorStop(0, colors.fresh); g.addColorStop(1, "transparent");
+      ctx.globalAlpha = 0.55; ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(p.x, p.y, scene.u * 0.35, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ---------- Specimen card ---------- */
+function describe(hand) {
+  const deg = Math.round(Math.atan(hand.slant) * 180 / Math.PI);
+  $("handNo").textContent = "No. " + String(hand.seed).padStart(4, "0");
+  $("sSlant").textContent = Math.abs(deg) < 3 ? "upright" : `${Math.abs(deg)}° ${deg > 0 ? "right" : "left"}`;
+  $("sX").textContent = `${Math.round(scene.u)} px`;
+  $("sP").textContent = hand.contrast > 1.15 ? "heavy downstrokes" : hand.contrast > 0.5 ? "moderate" : "even, light";
+  $("sB").textContent = hand.wob < 0.04 ? "steady" : hand.wob < 0.09 ? "wavering" : "wandering";
+  $("sC").textContent = (hand.joined ? "connected" : "printed") + (hand.space > 0.12 ? ", open" : hand.space < 0 ? ", cramped" : "");
+  $("sN").textContent = scene.N.toLocaleString("en-US");
+}
+
+/* ---------- Control ---------- */
+let hand;
+function seedFromHash() { const m = /^#hand-(\d{1,6})$/.exec(location.hash); return m ? parseInt(m[1], 10) : null; }
+
+function write(newHand, { animate = true, dissolve = true } = {}) {
+  if (scene && dissolve && !reduceMotion.matches) {
+    const old = scene.ps;
+    for (let i = 0; i < old.n; i++) { old.vx[i] = (Math.random() - 0.5) * 2; old.vy[i] = (Math.random() - 0.5) * 2 - 0.5; if (!old.alive[i]) { old.x[i] = -99; old.y[i] = -99; } }
+    dying.push({ ps: old, t0: performance.now() / 1000 });
+  }
+  hand = newHand;
+  scene = buildScene(hand);
+  start = performance.now() / 1000;
+  if (!animate || reduceMotion.matches) settleAll(scene.ps);
+  describe(hand);
+}
+
+function newHand() {
+  const seed = 1 + Math.floor(Math.random() * 9999);
+  try { history.replaceState(null, "", "#hand-" + seed); } catch (e) { try { location.hash = "hand-" + seed; } catch (e2) {} }
+  write(makeHand(seed));
+}
+
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+
+let resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { resize(); write(hand, { animate: false, dissolve: false }); }, 120);
+});
+window.addEventListener("hashchange", () => { const s = seedFromHash(); if (s && (!hand || s !== hand.seed)) write(makeHand(s)); });
+canvas.addEventListener("pointermove", (e) => { pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true; });
+canvas.addEventListener("pointerdown", (e) => { pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true; });
+canvas.addEventListener("pointerleave", () => { pointer.active = false; });
+canvas.addEventListener("pointerup", (e) => { if (e.pointerType !== "mouse") pointer.active = false; });
+$("newHand").addEventListener("click", newHand);
+$("rewrite").addEventListener("click", () => write(hand, { dissolve: false }));
+window.addEventListener("keydown", (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === "n" || e.key === "N") newHand();
+  if (e.key === "r" || e.key === "R") write(hand, { dissolve: false });
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readColors);
+new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+readColors(); resize();
+write(makeHand(seedFromHash() || (1 + Math.floor(Math.random() * 9999))), { dissolve: false });
+requestAnimationFrame(frame);
+})();
+</script>
